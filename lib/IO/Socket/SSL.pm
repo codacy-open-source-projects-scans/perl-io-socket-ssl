@@ -2318,6 +2318,10 @@ my $DEFAULT_SSL_OP = &Net::SSLeay::OP_ALL
     | &Net::SSLeay::OP_SINGLE_DH_USE
     | ($can_ecdh ? &Net::SSLeay::OP_SINGLE_ECDH_USE : 0);
 
+
+# _get_ctx_object is for internal use ONLY!
+sub _get_ctx_object { shift->{context} }
+
 # Note that the final object will actually be a reference to the scalar
 # (C-style pointer) returned by Net::SSLeay::CTX_*_new() so that
 # it can be blessed.
@@ -2881,6 +2885,7 @@ sub new {
     }
     my $verify_fingerprint = @accept_fp && do {
 	my $fail;
+	my $force = $arg_hash->{SSL_force_fingerprint};
 	sub {
 	    my ($ok,$cert,$depth) = @_;
 	    $fail = 1 if ! $ok;
@@ -2894,7 +2899,7 @@ sub new {
 		next if $fp ne $_->[2];
 		return 1;
 	    }
-	    return ! $fail;
+	    return $force ? 0 : ! $fail;
 	}
     };
     my $verify_callback = ( $verify_cb || @accept_fp ) && sub {
