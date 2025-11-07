@@ -1,3 +1,24 @@
+2.095 2025/07/10
+- regression: make sysread set buffer to empty string again when returning
+  EOf. Fixes #171
+2.094 2025/06/18
+- fixed memory leak introduced in 2.092
+2.093 2025/06/17
+- Another rework for one-sided SSL shutdown, to a) implement a useful and secure
+  behavior and b) without affecting existing applications. 2.092 had still
+  unwanted side effects
+2.092 2025/06/16
+- rework implementation and behavior for one-sided SSL shutdown. Implementation
+  in 2.091 lead to some problems with Net::FTP and others.
+2.091 2025/06/11
+- fix behavior on one-sided SSL shutdown. If the application continued
+  to read after half-closing the SSL connection this could result in reading
+  encrypted data (i.e. close notify, SSL session tickets ...).
+  See documentation of stop_SSL for detailed description of handling
+  half-closed SSL connections.
+2.090 2025/06/03
+- fix OCSP live test after Let's Encrypt has disabled OCSP support #169
+- public_suffix now preserves trailing dot #167
 2.089 2024/08/29
 - new option SSL_force_fingerprint to enforce fingerprint matching even if
   certificate validation would be successful without
