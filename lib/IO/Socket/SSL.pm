@@ -3077,8 +3077,11 @@ sub new {
 		    # documented but given the age of this function we'll assume
 		    # that this will stay this way in the future.
 		    while (my $ca = pop @chain) {
-			Net::SSLeay::CTX_add_extra_chain_cert($ctx,$ca)
-			    or last PKCS12;
+			next if Net::SSLeay::CTX_add_extra_chain_cert($ctx,$ca);
+			# failed - free everything not added yet and exit loop
+			Net::SSLeay::X509_free($ca);
+			Net::SSLeay::X509_free($_) for @chain;
+			last PKCS12;
 		    }
 		    last if $key && ! Net::SSLeay::CTX_use_PrivateKey($ctx,$key);
 		    $havecert = 'PKCS12';
@@ -3790,8 +3793,9 @@ sub new {
     }
     while ( my($uri,$v) = each %todo) {
 	my $ids = $v->{ids};
-	$v->{req} = Net::SSLeay::i2d_OCSP_REQUEST(
-	    Net::SSLeay::OCSP_ids2req(@$ids));
+	my $oreq = Net::SSLeay::OCSP_ids2req(@$ids);
+	$v->{req} = Net::SSLeay::i2d_OCSP_REQUEST($oreq);
+	Net::SSLeay::OCSP_REQUEST_free($oreq);
     }
     $hard_error ||= '' if ! %todo;
     return bless {
@@ -3817,19 +3821,19 @@ sub requests {
 
 # add new response
 sub add_response {
-    my ($self,$uri,$resp) = @_;
+    my ($self,$uri,$resp_d) = @_;
     my $todo = delete $self->{todo}{$uri};
     return $self->{error} if ! $todo || $self->{error};
 
-    my ($req,@soft_error,@hard_error);
+    my ($req,$resp,@soft_error,@hard_error);
 
     # do we have a response
-    if (!$resp) {
+    if (!$resp_d) {
 	@soft_error = "http request for OCSP failed; subject: ".
 	    join("; ",@{$todo->{subj}});
 
     # is it a valid OCSP_RESPONSE
-    } elsif ( ! eval { $resp = Net::SSLeay::d2i_OCSP_RESPONSE($resp) }) {
+    } elsif ( ! eval { $resp = Net::SSLeay::d2i_OCSP_RESPONSE($resp_d) }) {
 	@soft_error = "invalid response (no OCSP_RESPONSE); subject: ".
 	    join("; ",@{$todo->{subj}});
 	# hopefully short-time error
@@ -3907,8 +3911,9 @@ sub add_response {
 	    # try again
 	    $self->{todo}{$uri} = $todo;
 	    $todo->{ids} = \@miss;
-	    $todo->{req} = Net::SSLeay::i2d_OCSP_REQUEST(
-		Net::SSLeay::OCSP_ids2req(@miss));
+	    my $oreq = Net::SSLeay::OCSP_ids2req(@miss);
+	    $todo->{req} = Net::SSLeay::i2d_OCSP_REQUEST($oreq);
+	    Net::SSLeay::OCSP_REQUEST_free($oreq);
 	    $DEBUG>=2 && DEBUG("$uri just answered ".@found." of ".(@found+@miss)." requests");
 	}
     } else {
@@ -3921,6 +3926,7 @@ sub add_response {
 	}) for (@{$todo->{ids}});
     }
 
+    Net::SSLeay::OCSP_RESPONSE_free($resp) if $resp;
     Net::SSLeay::OCSP_REQUEST_free($req) if $req;
     if ($self->{failhard}) {
 	push @hard_error,@soft_error;

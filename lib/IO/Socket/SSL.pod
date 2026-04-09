@@ -1752,8 +1752,9 @@ Net::SSLeay.
 =item B<peer_certificate($field;[$refresh])>
 
 If a peer certificate exists, this function can retrieve values from it.
-If no field is given the internal representation of certificate from Net::SSLeay
-is returned.
+If no field is given the internal representation of certificate (X509 handle)
+from Net::SSLeay is returned, with reference owned internally (i.e. should not
+be freed).
 If refresh is true it will not used a cached version, but check again in case
 the certificate of the connection has changed due to renegotiation.
 
@@ -1788,15 +1789,20 @@ See Net::SSLeay::X509_get_subjectAltNames.
 
 This is similar to C<peer_certificate> but will return the sites own
 certificate. The same arguments for B<$field> can be used.
-If no B<$field> is given the certificate handle from the underlying OpenSSL will
-be returned. This handle will only be valid as long as the SSL connection exists
-and if used afterwards it might result in strange crashes of the application.
+If no B<$field> is given the X509 handle from the underlying OpenSSL will
+be returned. This handle is owned internally and will only be valid as long as
+the SSL connection exists. If used afterwards it might result in strange crashes
+of the application.
 
 =item B<peer_certificates>
 
-This returns all the certificates send by the peer, e.g. first the peers own
-certificate and then the rest of the chain. You might use B<CERT_asHash> from
-L<IO::Socket::SSL::Utils> to inspect each of the certificates.
+This returns all the certificates send by the peer as X509 handles, e.g. first
+the peers own certificate and then the rest of the chain. You might use
+B<CERT_asHash> from L<IO::Socket::SSL::Utils> to inspect each of the
+certificates.
+
+Like with B<sock_certificate> and B<peer_certificates> the handles are owned
+internally and will only be valid as long as the SSL connection exists.
 
 This function depends on a version of Net::SSLeay >= 1.58 .
 
