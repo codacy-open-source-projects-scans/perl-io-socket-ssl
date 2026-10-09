@@ -13,7 +13,7 @@
 
 package IO::Socket::SSL;
 
-our $VERSION = '2.098';
+our $VERSION = '2.099';
 
 use IO::Socket;
 use Net::SSLeay 1.46;
@@ -645,6 +645,8 @@ sub configure {
     # set Blocking only explicitly if it was set
     $arg_hash->{Blocking} = 1 if defined ($blocking);
 
+    # close newly created socket on SSL fail
+    $arg_hash->{SSL_keepSocketOnError} = 0 if !exists $arg_hash->{SSL_keepSocketOnError};
     $self->configure_SSL($arg_hash) || return;
 
     if ($arg_hash->{$family_key} ||= $arg_hash->{Domain} || $arg_hash->{Family}) {
@@ -673,6 +675,9 @@ sub configure_SSL {
 
     # add user defined defaults, maybe after filtering
     $FILTER_SSL_ARGS->($is_server,$arg_hash) if $FILTER_SSL_ARGS;
+
+    # keep socket open on error by default when just upgrading
+    $arg_hash->{SSL_keepSocketOnError} = 1 if !exists $arg_hash->{SSL_keepSocketOnError};
 
     # cleanup in case there was something left, but leave BIO socket
     _cleanup_ssl($self, undef, '_SSL_bio_socket');
@@ -1943,13 +1948,13 @@ sub start_SSL {
     }
 
     if (!$socket->configure_SSL($arg_hash)) {
-	bless($socket, $original_class) if $original_class;
+	bless($socket, $original_class) if defined $original_class;
 	return;
     }
 
     ${*$socket}{'_SSL_fileno'} = $original_fileno;
     ${*$socket}{'_SSL_ioclass_upgraded'} = $original_class
-	if $class ne $original_class;
+	if defined $original_class and $class ne $original_class;
 
     my $start_handshake = $arg_hash->{SSL_startHandshake};
     if ( ! defined($start_handshake) || $start_handshake ) {
@@ -1964,7 +1969,7 @@ sub start_SSL {
 	    return $socket;
 	} else {
 	    # upgrade to SSL failed, downgrade socket to original class
-	    bless($socket,$original_class) if $original_class;
+	    bless($socket,$original_class) if defined $original_class;
 	    return;
 	}
     } else {
